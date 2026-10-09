@@ -4,6 +4,7 @@ namespace App\Services\Integrations;
 
 use App\Enums\IntegrationStatus;
 use App\Models\CancellationRequest;
+use App\Models\Customer;
 use App\Models\ExternalMapping;
 use App\Models\IntegrationJob;
 use App\Models\Subscription;
@@ -129,7 +130,7 @@ class IntegrationRunner
         ])->save();
 
         if ($externalReference && in_array($job->operation, ['create_or_link_account', 'link_planista'], true)) {
-            $model = $job->subject_type === 'Customer' ? \App\Models\Customer::find($job->subject_id) : Subscription::find($job->subject_id);
+            $model = $job->subject_type === 'Customer' ? Customer::find($job->subject_id) : Subscription::find($job->subject_id);
             if ($model) {
                 $scope = $job->franchise_id ? 'franchise-'.$job->franchise_id : 'default';
                 ExternalMapping::link($job->destination, $model, $externalReference, $job->destination === 'simplesvet' ? $scope : 'default');

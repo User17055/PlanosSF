@@ -7,6 +7,9 @@ return [
     // Ambiente de homologação: exibido em todas as telas e nos links gerados.
     'is_homologation' => env('PLANOS_HOMOLOGATION', true),
 
+    // Exibe na tela o código de confirmação quando não há servidor de e-mail (MAIL_MAILER=log). Nunca em produção.
+    'show_test_codes' => env('PLANOS_SHOW_TEST_CODES', false),
+
     'proposals' => [
         'expiry_days' => (int) env('PLANOS_PROPOSAL_EXPIRY_DAYS', 7),
         'link_expiry_days' => (int) env('PLANOS_LINK_EXPIRY_DAYS', 7),

@@ -3,6 +3,7 @@
 namespace App\Services\Audit;
 
 use App\Models\AuditLog;
+use App\Models\User;
 use App\Services\Access\FranchiseContext;
 use App\Support\Mask;
 use Illuminate\Database\Eloquent\Model;
@@ -32,9 +33,9 @@ class AuditLogger
         $user = auth()->user();
 
         return AuditLog::create([
-            'user_id' => $user instanceof \App\Models\User ? $user->id : null,
+            'user_id' => $user instanceof User ? $user->id : null,
             'franchise_id' => $this->context->has() ? $this->context->id() : null,
-            'actor_type' => $user instanceof \App\Models\User ? $actorType : ($actorType === 'user' ? 'system' : $actorType),
+            'actor_type' => $user instanceof User ? $actorType : ($actorType === 'user' ? 'system' : $actorType),
             'action' => $action,
             'auditable_type' => $subject ? class_basename($subject) : null,
             'auditable_id' => $subject?->getKey(),

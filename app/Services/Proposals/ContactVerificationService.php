@@ -42,6 +42,11 @@ class ContactVerificationService
 
         Mail::to($email)->send(new VerificationCodeMail($code, $purpose));
 
+        // Somente homologação sem servidor de e-mail: exibe o código na tela para permitir o teste.
+        if (config('planos.show_test_codes') && config('planos.is_homologation') && config('mail.default') === 'log') {
+            session()->flash('homolog_code', $code);
+        }
+
         return $verification;
     }
 

@@ -1,58 +1,91 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# PlanosSF — Planos de saúde veterinária São Francisco
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Software web para comercialização e gestão dos planos: apresentação do plano, cadastro de tutor e pet,
+contrato, confirmação do pagamento, vigência, carências, autorização de atendimentos e encerramento,
+para toda a rede de franquias. Implementa a *Especificação de Software — Planos São Francisco (PHP/VPS)*.
 
-## About Laravel
+**Stack:** PHP 8.3+ · Laravel 13 · Blade + Bootstrap 5 · MySQL 8 (InnoDB) · Redis (fila/cache) ·
+Nginx + PHP-FPM · systemd + cron · dompdf.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Mapa dos requisitos
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Requisito | Onde está |
+|---|---|
+| RF-01 tutores e pets, histórico | `CustomerController`, `PetController`, `audit_logs` |
+| RF-02 catálogo versionado | `Services/Catalog/PlanCatalogService` — versão publicada é imutável |
+| RF-03 propostas nos 3 canais | `Services/Proposals/ProposalService`, `Public/SiteController`, `Public/PublicProposalController` |
+| RF-04 aceite, tablet, papel, PDF | `Services/Contracts/ContractService`, `ContractPdfService`, `TabletController`, `DocumentController` |
+| RF-05/06 cobrança e conciliação | `Services/Billing/*` (Vindi e simulador), `webhook_inbox`, `planos:reconcile` |
+| RF-07 vigência e elegibilidade | `Services/Subscriptions/ActivationService` (serviço único de ativação) |
+| RF-08/09 carência, reserva, consumo, estorno | `Services/Benefits/*` (bloqueio cliente → assinatura → período) |
+| RF-10 SimplesVet/TudoPraPet | `Services/Integrations/*` — tarefas manuais auditadas até haver API confirmada |
+| RF-11 painel e portal | `resources/views`, `Portal/*` |
+| RF-12 permissões, auditoria, recuperação | `Services/Access/*`, `AuditLogger`, outbox, inbox, reprocessamento |
+| RF-13/15 franquias e visões | `FranchiseContext` (escopo validado no servidor a cada requisição) |
+| RF-14 bloqueio financeiro global | `Services/Financial/FinancialStatusService` — sem liberação manual |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Critérios de homologação da seção 17 e 27.10: `tests/Feature/*` (`php artisan test`).
 
-## Learning Laravel
+## Decisões pendentes (seção 19)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Ficam em **Gestão → Configurações e decisões** e desabilitam a funcionalidade enquanto pendentes:
+recebimento presencial e reflexo na Vindi; franquia de origem no site; carência durante suspensão;
+conta Vindi central x por franquia; desconto de planista no TudoPraPet. Planos, valores, coberturas,
+carências e texto contratual reais devem ser cadastrados pela São Francisco — o seed de homologação
+contém apenas exemplos sem validade comercial.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Instalação na VPS (Ubuntu 24.04)
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+apt install nginx mysql-server redis-server php8.3-fpm php8.3-cli php8.3-mysql php8.3-mbstring \
+  php8.3-xml php8.3-curl php8.3-zip php8.3-bcmath php8.3-intl php8.3-gd composer nodejs npm certbot
+git clone git@github.com:User17055/PlanosSF.git /var/www/planossf && cd /var/www/planossf
+cp .env.example .env            # preencher DB_*, APP_URL, VINDI_* (nunca versionar o .env)
+composer install --no-dev --optimize-autoloader && npm ci && npm run build
+php artisan key:generate && php artisan migrate --force && php artisan db:seed --force
+php artisan planos:create-user admin@exemplo.com "Administrador" admin_tecnico CENTRAL
+chown -R www-data:www-data storage bootstrap/cache && chmod 640 .env
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+- **Nginx:** raiz exclusivamente em `public/`; bloquear arquivos ocultos; HTTPS via certbot.
+- **Fila:** `deploy/planossf-queue.service` → `/etc/systemd/system/` e `systemctl enable --now planossf-queue`.
+- **Agendador:** `/etc/cron.d/planossf` com `* * * * * www-data cd /var/www/planossf && php artisan schedule:run`.
+- **Webhook Vindi:** `https://<domínio>/webhooks/vindi/<VINDI_WEBHOOK_SECRET>`.
+- **MySQL e Redis** escutando apenas em localhost.
 
-## Contributing
+## Implantação, rollback e backup
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- Deploy: `bash deploy/deploy.sh` (faz dump do banco antes das migrations, reinicia workers e verifica).
+- Rollback de código: `bash deploy/rollback.sh <commit>` — não desfaz banco; reversão de banco exige
+  restaurar backup em homologação e nunca pode apagar pagamentos recebidos.
+- Backup: `deploy/backup.sh` (banco + documentos criptografados, retenção 30 dias, cópia externa via
+  `BACKUP_REMOTE`). Guarde a `APP_KEY` e a senha do backup fora da VPS. Teste a restauração.
 
-## Code of Conduct
+## Rotinas agendadas
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+`planos:dispatch-integrations` (1 min) · `planos:reconcile --pending` (10 min) · `planos:expire-reservations`
+(10 min) · `planos:activate-pending` / `planos:execute-cancellations` (15 min) · `planos:expire-proposals`,
+`planos:review-due-dates` (1 h) · `planos:reconcile` completo (03:00). O painel mostra a última execução,
+o tamanho e a idade da fila, falhas de PDF, webhooks e integrações pendentes.
 
-## Security Vulnerabilities
+## Endpoints internos (seção 14)
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+| Especificação | Rota |
+|---|---|
+| POST /proposals | `POST /painel/propostas` |
+| POST /proposals/{id}/links | `POST /painel/propostas/{id}/link`, `/link/revogar` |
+| POST /proposals/{id}/accept | `POST /p/{token}/aceite` (titular) |
+| POST /contracts/{id}/files · /validate | `POST /painel/contratos/{id}/digitalizacao`, `/painel/arquivos/{id}/conferencia` |
+| POST /subscriptions/{id}/checkout | `POST /painel/assinaturas/{id}/cobranca`, `POST /p/{token}/pagamento` |
+| POST /webhooks/vindi | `POST /webhooks/vindi/{segredo}` |
+| GET /subscriptions/{id}/eligibility | `GET /painel/autorizacao/assinatura/{id}` |
+| POST /authorizations · consume · reverse | `POST /painel/autorizacao/assinatura/{id}/reservar`, `/painel/autorizacoes/{uuid}/executar`, `/estornar` |
+| POST /subscriptions/{id}/cancel | `POST /painel/assinaturas/{id}/cancelar` |
+| GET /customers/{id}/overview | `GET /painel/clientes/{id}` |
 
-## License
+## Homologação
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Com `PLANOS_BILLING_DRIVER=fake`, a página de pagamento é um simulador: aprova, recusa, estorna, emite a
+próxima mensalidade ou torna a fatura vencida, e a confirmação chega por webhook como no provedor real.
+Antes de produção: sandbox da Vindi validado, contrato aprovado, e-mail transacional configurado,
+`PLANOS_HOMOLOGATION=false`, backups externos e restauração testada.

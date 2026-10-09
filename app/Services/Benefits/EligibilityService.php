@@ -3,6 +3,7 @@
 namespace App\Services\Benefits;
 
 use App\Enums\AuthorizationStatus;
+use App\Enums\SubscriptionStatus;
 use App\Models\Authorization;
 use App\Models\BenefitLedgerEntry;
 use App\Models\BenefitPeriod;
@@ -10,6 +11,7 @@ use App\Models\BenefitRule;
 use App\Models\Subscription;
 use App\Services\Financial\FinancialStatusService;
 use App\Support\BusinessTime;
+use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
@@ -47,13 +49,19 @@ class EligibilityService
         }
         $checks[] = ['rule' => 'contrato', 'ok' => true];
 
+        $financial = $this->financial->evaluate($subscription->customer);
+
         if (! $subscription->isActive() || ! $subscription->effective_start_at || $subscription->effective_start_at->gt($at)
             || ($subscription->end_at && $subscription->end_at->lte($at))) {
+            // Suspensão por dívida: a mensagem informa a inadimplência e a orientação de regularização.
+            if ($subscription->status === SubscriptionStatus::Suspended && $financial->isDelinquent()) {
+                return Decision::deny('CUSTOMER_DELINQUENT', $financial->blockMessage(), $checks);
+            }
+
             return Decision::deny('SUBSCRIPTION_NOT_ACTIVE', 'Assinatura não vigente ('.$subscription->status->label().').', $checks);
         }
         $checks[] = ['rule' => 'vigencia', 'ok' => true];
 
-        $financial = $this->financial->evaluate($subscription->customer);
         if (! $financial->isRegular()) {
             return Decision::deny(
                 $financial->isDelinquent() ? 'CUSTOMER_DELINQUENT' : 'FINANCIAL_VERIFICATION_PENDING',
@@ -124,7 +132,7 @@ class EligibilityService
         }
 
         if ($rule->copay_cents) {
-            $checks[] = ['rule' => 'coparticipacao', 'ok' => true, 'detail' => 'Coparticipação de '.\App\Support\Money::format($rule->copay_cents).' ('.$rule->copay_stage.', recebe: '.$rule->copay_receiver.')'];
+            $checks[] = ['rule' => 'coparticipacao', 'ok' => true, 'detail' => 'Coparticipação de '.Money::format($rule->copay_cents).' ('.$rule->copay_stage.', recebe: '.$rule->copay_receiver.')'];
         }
 
         return Decision::allow($rule->quantity_limit, $available, $checks, $start, $end);

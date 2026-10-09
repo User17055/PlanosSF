@@ -1,5 +1,9 @@
 <?php
 
+use App\Models\Franchise;
+use App\Models\FranchiseUser;
+use App\Models\Role;
+use App\Models\User;
 use App\Services\Benefits\BenefitService;
 use App\Services\Billing\ReconciliationService;
 use App\Services\Financial\FinancialStatusService;
@@ -10,6 +14,7 @@ use App\Services\Subscriptions\CancellationService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Str;
 
 /*
  * Rotinas da seção 23. O agendador apenas dispara; cada rotina registra sua última execução
@@ -63,6 +68,22 @@ Artisan::command('planos:dispatch-integrations', function (IntegrationRunner $s)
     $n = $s->dispatchDue();
     $heartbeat('dispatch-integrations', "{$n} execuções");
 })->purpose('Despacha a outbox de integrações automáticas');
+
+Artisan::command('planos:create-user {email} {name} {role} {franchise=CENTRAL}', function () {
+    $role = Role::where('key', $this->argument('role'))->firstOrFail();
+    $franchise = Franchise::where('code', $this->argument('franchise'))->firstOrFail();
+    $password = Str::password(16, symbols: false);
+    $user = User::firstOrCreate(
+        ['email' => strtolower($this->argument('email'))],
+        ['name' => $this->argument('name'), 'password' => $password, 'is_active' => true],
+    );
+    FranchiseUser::updateOrCreate(
+        ['user_id' => $user->id, 'franchise_id' => $franchise->id],
+        ['role_id' => $role->id, 'is_active' => true],
+    );
+    // A senha só é impressa quando o usuário é criado agora; não é registrada em log.
+    $this->line($user->wasRecentlyCreated ? "{$user->email}\t{$password}" : "{$user->email}\t(já existia; senha mantida)");
+})->purpose('Cria usuário com vínculo e perfil (gera senha aleatória)');
 
 Artisan::command('planos:heartbeat', function () use ($heartbeat) {
     $heartbeat('scheduler', 'ok');

@@ -88,7 +88,7 @@ class ReconciliationService
     {
         $ok = 0;
         $failed = [];
-        Subscription::where('billing_provider', $this->gateway->name())
+        Subscription::with('customer')->where('billing_provider', $this->gateway->name())
             ->where('billing_status', 'created')
             ->when($pendingOnly, fn ($q) => $q->where('status', SubscriptionStatus::AwaitingRegularization->value))
             ->when(! $pendingOnly, fn ($q) => $q->whereNotIn('status', [SubscriptionStatus::Ended->value]))

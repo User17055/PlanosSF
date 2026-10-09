@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\Subscription;
 use App\Services\Audit\AuditLogger;
 use App\Services\Subscriptions\SubscriptionRecorder;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -92,7 +93,7 @@ class InvoiceSyncService
         });
     }
 
-    /** @param array{id: string, status: string, provider_status: string, amount_cents: int, paid_at: ?\Carbon\CarbonImmutable, method: ?string} $charge */
+    /** @param array{id: string, status: string, provider_status: string, amount_cents: int, paid_at: ?CarbonImmutable, method: ?string} $charge */
     protected function syncCharge(Invoice $invoice, array $charge, string $provider): void
     {
         $status = match ($charge['status']) {

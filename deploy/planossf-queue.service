@@ -1,0 +1,19 @@
+[Unit]
+Description=PlanosSF - fila do Laravel (pagamentos, documentos, integrações)
+After=network-online.target mysql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/planossf
+# Prioridade: confirmação financeira antes de PDFs e integrações. timeout < retry_after (90 < 180).
+ExecStart=/usr/bin/php artisan queue:work redis --queue=payments,documents,default,integrations --sleep=3 --tries=8 --timeout=90 --max-time=3600
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=100
+
+[Install]
+WantedBy=multi-user.target

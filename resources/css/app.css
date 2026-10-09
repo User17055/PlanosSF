@@ -1,0 +1,64 @@
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import 'bootstrap-icons/font/bootstrap-icons.min.css';
+
+:root {
+    --sf-primary: #0f5c4d;
+    --sf-primary-rgb: 15, 92, 77;
+    --sf-bg: #f5f7f6;
+    --bs-primary: var(--sf-primary);
+    --bs-primary-rgb: var(--sf-primary-rgb);
+    --bs-link-color: var(--sf-primary);
+    --bs-link-color-rgb: var(--sf-primary-rgb);
+    --bs-link-hover-color: #0a4035;
+}
+
+body { background: var(--sf-bg); font-size: .95rem; }
+
+.btn-primary {
+    --bs-btn-bg: var(--sf-primary);
+    --bs-btn-border-color: var(--sf-primary);
+    --bs-btn-hover-bg: #0a4035;
+    --bs-btn-hover-border-color: #0a4035;
+    --bs-btn-active-bg: #08352c;
+    --bs-btn-disabled-bg: var(--sf-primary);
+    --bs-btn-disabled-border-color: var(--sf-primary);
+}
+.btn-outline-primary {
+    --bs-btn-color: var(--sf-primary);
+    --bs-btn-border-color: var(--sf-primary);
+    --bs-btn-hover-bg: var(--sf-primary);
+    --bs-btn-hover-border-color: var(--sf-primary);
+    --bs-btn-active-bg: var(--sf-primary);
+}
+.text-primary { color: var(--sf-primary) !important; }
+.bg-primary { background-color: var(--sf-primary) !important; }
+
+.sf-navbar { background: var(--sf-primary); }
+.sf-navbar .navbar-brand { font-weight: 700; }
+.sf-navbar .nav-link { color: rgba(255, 255, 255, .85); }
+.sf-navbar .nav-link:hover, .sf-navbar .nav-link.active { color: #fff; }
+
+.sf-homolog-banner {
+    background: repeating-linear-gradient(45deg, #fff3cd, #fff3cd 12px, #ffe69c 12px, #ffe69c 24px);
+    color: #664d03; font-weight: 600; text-align: center; padding: .25rem; font-size: .8rem;
+}
+
+.card { border: 0; box-shadow: 0 1px 3px rgba(0, 0, 0, .06); }
+.card-header { background: #fff; font-weight: 600; }
+.table > :not(caption) > * > * { vertical-align: middle; }
+.stat-card .value { font-size: 1.75rem; font-weight: 700; }
+.small-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #6c757d; }
+
+.signature-pad {
+    border: 2px dashed #adb5bd; border-radius: .5rem; background: #fff;
+    touch-action: none; width: 100%; height: 260px; cursor: crosshair;
+}
+
+.contract-text {
+    white-space: pre-wrap; font-family: Georgia, 'Times New Roman', serif; font-size: .95rem;
+    max-height: 420px; overflow-y: auto; background: #fff; border: 1px solid #dee2e6;
+    border-radius: .375rem; padding: 1rem;
+}
+
+.public-hero { background: linear-gradient(135deg, var(--sf-primary), #13806b); color: #fff; }
+.block-alert { border-left: 6px solid #dc3545; }

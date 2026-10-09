@@ -33,9 +33,19 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            'serve' => false,
             'throw' => false,
             'report' => false,
+        ],
+
+        // Contratos, digitalizações e anexos: área privada, sem URL pública; download autorizado pela aplicação.
+        'documents' => [
+            'driver' => 'local',
+            'root' => env('PLANOS_DOCUMENTS_ROOT', storage_path('app/private/documents')),
+            'serve' => false,
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => true,
         ],
 
         'public' => [

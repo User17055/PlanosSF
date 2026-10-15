@@ -27,9 +27,23 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(AuditLogger::class);
         $this->app->scoped(Settings::class);
 
-        $this->app->bind(BillingGateway::class, fn ($app) => match (config('planos.billing.driver')) {
-            'vindi' => $app->make(VindiBillingGateway::class),
-            default => $app->make(FakeBillingGateway::class),
+        // Fora de homologação, simulador ou sandbox deixariam o cliente "pagar" sem cobrança real.
+        $this->app->bind(BillingGateway::class, function ($app) {
+            $driver = config('planos.billing.driver');
+            $homologation = (bool) config('planos.is_homologation');
+
+            if ($driver === 'fake' && ! $homologation) {
+                throw new \RuntimeException('PLANOS_BILLING_DRIVER=fake só é aceito com PLANOS_HOMOLOGATION=true.');
+            }
+            if ($driver === 'vindi' && ! $homologation && str_contains((string) config('planos.billing.vindi.base_url'), 'sandbox')) {
+                throw new \RuntimeException('Fora de homologação a Vindi não pode apontar para o sandbox: configure VINDI_BASE_URL.');
+            }
+
+            return match ($driver) {
+                'fake' => $app->make(FakeBillingGateway::class),
+                'vindi' => $app->make(VindiBillingGateway::class),
+                default => throw new \RuntimeException("PLANOS_BILLING_DRIVER desconhecido: {$driver}."),
+            };
         });
     }
 

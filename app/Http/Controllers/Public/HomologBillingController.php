@@ -16,9 +16,13 @@ use Illuminate\Support\Facades\URL;
  */
 class HomologBillingController extends Controller
 {
-    public function __construct(protected BillingGateway $gateway)
+    protected BillingGateway $gateway;
+
+    public function __construct()
     {
-        abort_unless($gateway instanceof FakeBillingGateway, 404);
+        // Fora de homologação a rota não existe, mesmo com link assinado antigo.
+        abort_unless(config('planos.is_homologation') && config('planos.billing.driver') === 'fake', 404);
+        $this->gateway = app(BillingGateway::class);
     }
 
     public function show(string $bill)

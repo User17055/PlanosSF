@@ -102,12 +102,20 @@ jobs:
           DB_PASSWORD: planossf
         run: php artisan test
 
+      # Banco limpo, migrado pelo dono (a suíte deixa linhas gravadas), e o usuário da aplicação.
       - name: Create the application user (deploy/app-grants.sh)
         env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: planossf_test
+          DB_USERNAME: planossf
+          DB_PASSWORD: planossf
           PLANOS_DB: planossf_test
           PLANOS_APP_HOST: '%'
           MYSQL: mysql -h 127.0.0.1 -uroot -proot
         run: |
+          php artisan migrate:fresh --force
           $MYSQL -e "CREATE USER 'planossf_app'@'%' IDENTIFIED BY 'planossf_app'"
           bash deploy/app-grants.sh
 

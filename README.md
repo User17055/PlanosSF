@@ -52,6 +52,10 @@ chown -R www-data:www-data storage bootstrap/cache && chmod 640 .env
 - **Agendador:** `/etc/cron.d/planossf` com `* * * * * www-data cd /var/www/planossf && php artisan schedule:run`.
 - **Webhook Vindi:** `https://<domínio>/webhooks/vindi/<VINDI_WEBHOOK_SECRET>`.
 - **MySQL e Redis** escutando apenas em localhost.
+- **Dois usuários de banco:** o `.env` usa o da aplicação (`planossf_app`), que não altera tabelas nem
+  muda o livro de benefícios, a auditoria e as evidências de aceite (`deploy/app-grants.sh`). O dono do
+  banco fica em `/root/.planossf-migrator.env` (`DB_USERNAME` e `DB_PASSWORD`, `chmod 600`), lido só
+  pelo deploy para rodar as migrations.
 
 ## Implantação, rollback e backup
 

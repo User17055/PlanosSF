@@ -102,6 +102,46 @@ jobs:
           DB_PASSWORD: planossf
         run: php artisan test
 
+      - name: Create the application user (deploy/app-grants.sh)
+        env:
+          PLANOS_DB: planossf_test
+          PLANOS_APP_HOST: '%'
+          MYSQL: mysql -h 127.0.0.1 -uroot -proot
+        run: |
+          $MYSQL -e "CREATE USER 'planossf_app'@'%' IDENTIFIED BY 'planossf_app'"
+          bash deploy/app-grants.sh
+
+      - name: Application user permissions
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: planossf_test
+          DB_USERNAME: planossf_app
+          DB_PASSWORD: planossf_app
+          PLANOS_CHECK_APP_GRANTS: 1
+        run: |
+          php artisan test --filter=AppDatabaseUserTest | tee app-user.txt
+          sed 's/\x1b\[[0-9;]*m//g' app-user.txt | grep -Eq "Tests: +3 passed"
+
+      - name: Control - the same test fails with the database owner
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: planossf_test
+          DB_USERNAME: planossf
+          DB_PASSWORD: planossf
+          PLANOS_CHECK_APP_GRANTS: 1
+        run: |
+          if php artisan test --filter=AppDatabaseUserTest > control.txt 2>&1; then
+            cat control.txt
+            echo "Passou com o dono do banco: o teste não distingue as permissões."
+            exit 1
+          fi
+          cat control.txt
+          sed 's/\x1b\[[0-9;]*m//g' control.txt | grep -q "deveria ser negado"
+
   assets:
     runs-on: ubuntu-latest
 

@@ -24,9 +24,18 @@ sudo -u deploy -H npm run build --silent
 
 echo "==> Banco e caches"
 php artisan down --retry=15 || true
-php artisan migrate --force
-php artisan db:seed --class=AccessSeeder --force
+# Sem cache de config, as variáveis do ambiente valem mais que o .env: a migration roda com o dono do
+# banco (arquivo só do root) e a aplicação, com o usuário do .env, que não altera tabelas.
 php artisan optimize:clear >/dev/null
+MIGRATOR_ENV=/root/.planossf-migrator.env
+if [ -f "$MIGRATOR_ENV" ]; then
+  (set -a; . "$MIGRATOR_ENV"; set +a; php artisan migrate --force)
+else
+  echo "AVISO: $MIGRATOR_ENV não existe; migration com o usuário do .env." >&2
+  php artisan migrate --force
+fi
+bash deploy/app-grants.sh
+php artisan db:seed --class=AccessSeeder --force
 php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan event:cache
 chown -R www-data:www-data storage bootstrap/cache
 php artisan up

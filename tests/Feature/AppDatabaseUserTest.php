@@ -57,7 +57,7 @@ class AppDatabaseUserTest extends TestCase
         $this->assertSame(0, DB::table('proposals')->where('id', 0)->update(['id' => 0]));
     }
 
-    // Por último: no MySQL, DDL encerra a transação do teste se chegar a executar.
+    // Por último: no MySQL, DDL pode encerrar a transação do teste (commit implícito) mesmo negado.
     public function test_usuario_da_aplicacao_nao_altera_a_estrutura(): void
     {
         $this->assertDenied(fn () => DB::statement('CREATE TABLE zz_app_grants (id INT)'), 'CREATE TABLE');

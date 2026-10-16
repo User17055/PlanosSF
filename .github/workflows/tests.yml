@@ -142,6 +142,7 @@ jobs:
           DB_PASSWORD: planossf
           PLANOS_CHECK_APP_GRANTS: 1
         run: |
+          php artisan migrate:fresh --force
           if php artisan test --filter=AppDatabaseUserTest > control.txt 2>&1; then
             cat control.txt
             echo "Passou com o dono do banco: o teste não distingue as permissões."

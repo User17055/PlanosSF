@@ -18,7 +18,10 @@ sudo -u deploy git fetch --quiet origin
 sudo -u deploy git reset --hard origin/main
 
 echo "==> Dependências de produção"
-sudo -u deploy -H composer install --no-dev --optimize-autoloader --no-interaction --quiet
+sudo -u deploy -H composer install --no-dev --optimize-autoloader --no-interaction --no-scripts --quiet
+# Os scripts do composer gravam em bootstrap/cache, que é do www-data: rodam aqui, como root.
+rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
+php artisan package:discover >/dev/null
 sudo -u deploy -H npm ci --no-audit --no-fund --silent
 sudo -u deploy -H npm run build --silent
 

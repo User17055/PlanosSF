@@ -148,8 +148,13 @@ class EligibilityService
         }
 
         $windowStart = $this->periods->rollingWindowStart($rule, $at);
+        // Na janela móvel o estorno conta pela data do consumo que desfaz: estornar um consumo que já saiu
+        // da janela não devolve saldo.
         $consumed = (int) BenefitLedgerEntry::where('benefit_period_id', $period->id)
-            ->when($windowStart, fn ($q) => $q->where('occurred_at', '>', $windowStart))
+            ->when($windowStart, fn ($q) => $q->where(fn ($w) => $w
+                ->where(fn ($c) => $c->whereNull('original_entry_id')->where('occurred_at', '>', $windowStart))
+                ->orWhereIn('original_entry_id', BenefitLedgerEntry::select('id')
+                    ->where('benefit_period_id', $period->id)->where('occurred_at', '>', $windowStart))))
             ->sum('quantity');
 
         $reserved = (int) Authorization::where('benefit_period_id', $period->id)

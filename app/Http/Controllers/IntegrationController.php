@@ -33,6 +33,7 @@ class IntegrationController extends Controller
 
     public function retry(Request $request, IntegrationJob $job, IntegrationRunner $runner)
     {
+        abort_unless($this->ctx->isCentral() || $job->franchise_id === $this->ctx->id(), 403);
         $runner->retry($job, $request->user());
 
         return back()->with('success', 'Reprocessamento executado: '.$job->fresh()->status->label().'.');
@@ -53,6 +54,8 @@ class IntegrationController extends Controller
 
     public function retryWebhook(WebhookInbox $inbox, AuditLogger $audit)
     {
+        // Eventos de cobrança não têm unidade: só a central os vê (index) e reprocessa.
+        abort_unless($this->ctx->isCentral(), 403);
         $inbox->forceFill(['status' => 'received'])->save();
         $audit->log('webhook.reprocess_requested', $inbox);
         ProcessWebhookEvent::dispatch($inbox->id)->onQueue('payments');

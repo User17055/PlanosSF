@@ -132,6 +132,31 @@ class FinancialBlockTest extends TestCase
         $this->assertSame(SubscriptionStatus::Active, $sub2->fresh()->status);
     }
 
+    public function test_suspensao_reativacao_e_nova_suspensao_no_mesmo_segundo_geram_integracoes_proprias(): void
+    {
+        $sub = $this->activeSubscription();
+        $this->passDays(40);
+        // Relógio parado: as três transições acontecem no mesmo segundo.
+        $this->travelTo(now()->setTime(9, 0));
+        $b1 = $this->nextBill($sub);
+        $b1->forceFill(['due_date' => now()->subDays(3)])->save();
+        app(FinancialStatusService::class)->reviewDueDates();
+        $this->assertSame(SubscriptionStatus::Suspended, $sub->fresh()->status);
+
+        $this->payBill($b1->external_id);
+        $this->assertSame(SubscriptionStatus::Active, $sub->fresh()->status);
+
+        $b2 = $this->nextBill($sub);
+        $b2->forceFill(['due_date' => now()->subDays(3)])->save();
+        app(FinancialStatusService::class)->reviewDueDates();
+        $this->assertSame(SubscriptionStatus::Suspended, $sub->fresh()->status);
+
+        $this->assertSame(2, IntegrationJob::where('operation', 'suspend_planista')->count());
+        $this->assertSame(2, IntegrationJob::where('operation', 'block_benefits')->count());
+        $this->assertSame(1, IntegrationJob::where('operation', 'reactivate_planista')->count());
+        $this->assertSame(1, IntegrationJob::where('operation', 'enable_benefits')->count());
+    }
+
     public function test_parcela_futura_e_recusa_antes_do_vencimento_nao_caracterizam_inadimplencia(): void
     {
         $sub = $this->activeSubscription();

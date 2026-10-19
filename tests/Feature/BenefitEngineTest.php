@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\AuthorizationStatus;
+use App\Enums\CoverageType;
 use App\Enums\PeriodType;
 use App\Models\Authorization;
 use App\Models\BenefitLedgerEntry;
@@ -123,6 +124,46 @@ class BenefitEngineTest extends TestCase
         $this->assertSame(2, BenefitLedgerEntry::count());
         $this->expectException(ValidationException::class);
         $svc->reverse($r['authorization'], $user, 'de novo');
+    }
+
+    public function test_estorno_de_consumo_que_ja_saiu_da_janela_movel_nao_devolve_saldo_extra(): void
+    {
+        $this->version = $this->publishedPlan([
+            ['service_code' => 'BANHO', 'description' => 'Banho', 'coverage_type' => CoverageType::Included, 'quantity_limit' => 1,
+                'unit' => 'banho', 'period_type' => PeriodType::RollingWindow, 'rolling_window_days' => 30, 'waiting_days' => 0],
+        ]);
+        $sub = $this->activeSubscription();
+        $svc = app(BenefitService::class);
+        $user = $this->userWith('gestor', $this->unitA);
+        $r = $svc->reserve($sub, $this->rule('BANHO'), 1, $user, $this->unitA, 'janela1');
+        $svc->consume($r['authorization'], $user, $this->unitA);
+
+        $next = $this->nextBill($sub);
+        $this->payBill($next->external_id);
+        $this->passDays(31);
+        $svc->reverse($r['authorization'], $user, 'lançado por engano');
+
+        $d = app(EligibilityService::class)->evaluate($sub->fresh(), $this->rule('BANHO'), $sub->pet_id, $this->unitA->id);
+        $this->assertTrue($d->allowed);
+        $this->assertSame(1, $d->available);
+    }
+
+    public function test_estorno_dentro_da_janela_movel_devolve_o_saldo(): void
+    {
+        $this->version = $this->publishedPlan([
+            ['service_code' => 'BANHO', 'description' => 'Banho', 'coverage_type' => CoverageType::Included, 'quantity_limit' => 1,
+                'unit' => 'banho', 'period_type' => PeriodType::RollingWindow, 'rolling_window_days' => 30, 'waiting_days' => 0],
+        ]);
+        $sub = $this->activeSubscription();
+        $svc = app(BenefitService::class);
+        $user = $this->userWith('gestor', $this->unitA);
+        $r = $svc->reserve($sub, $this->rule('BANHO'), 1, $user, $this->unitA, 'janela2');
+        $svc->consume($r['authorization'], $user, $this->unitA);
+        $eligibility = app(EligibilityService::class);
+        $this->assertSame('BENEFIT_LIMIT_REACHED', $eligibility->evaluate($sub->fresh(), $this->rule('BANHO'), $sub->pet_id, $this->unitA->id)->code);
+
+        $svc->reverse($r['authorization'], $user, 'lançado por engano');
+        $this->assertSame(1, $eligibility->evaluate($sub->fresh(), $this->rule('BANHO'), $sub->pet_id, $this->unitA->id)->available);
     }
 
     public function test_renovacao_mensal_nao_renova_saldo_anual(): void

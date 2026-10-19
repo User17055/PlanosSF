@@ -23,7 +23,13 @@ class PetController extends Controller
         $pet = $customer->pets()->create($this->validated($request) + ['created_by' => $request->user()->id]);
         $this->audit->log('pet.created', $pet);
 
-        return redirect()->to($request->input('return_to') ?: route('customers.show', $customer))->with('success', 'Pet cadastrado.');
+        // Só volta para uma página deste sistema: um return_to de fora seria um redirecionamento aberto.
+        $back = (string) $request->input('return_to');
+        if ($back === '' || parse_url($back, PHP_URL_HOST) !== $request->getHost()) {
+            $back = route('customers.show', $customer);
+        }
+
+        return redirect()->to($back)->with('success', 'Pet cadastrado.');
     }
 
     public function edit(Pet $pet)

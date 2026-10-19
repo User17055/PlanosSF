@@ -3,9 +3,15 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\EnsurePortalCustomer;
+use App\Models\FranchiseUser;
+use App\Models\IntegrationJob;
+use App\Models\Role;
+use App\Models\User;
+use App\Models\WebhookInbox;
 use App\Services\Access\FranchiseContext;
 use App\Services\Proposals\ProposalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\Concerns\BuildsScenario;
 use Tests\TestCase;
 
@@ -48,6 +54,80 @@ class AccessControlTest extends TestCase
         // Mas consegue consultar elegibilidade do mesmo cliente (identificação mínima).
         $this->actingAs($other)->withSession([FranchiseContext::SESSION_KEY => $this->unitB->id])
             ->get(route('benefits.subscription', $sub))->assertOk();
+    }
+
+    public function test_franquia_b_nao_registra_envio_de_link_de_proposta_da_franquia_a(): void
+    {
+        $customer = $this->customer();
+        $proposal = $this->proposal($customer, $this->pet($customer), $this->unitA);
+
+        $this->actingAs($this->userWith('vendedor', $this->unitB))->withSession([FranchiseContext::SESSION_KEY => $this->unitB->id])
+            ->post(route('proposals.link.sent', $proposal), ['channel' => 'whatsapp'])->assertForbidden();
+        $this->actingAs($this->userWith('vendedor', $this->unitA))->withSession([FranchiseContext::SESSION_KEY => $this->unitA->id])
+            ->post(route('proposals.link.sent', $proposal), ['channel' => 'whatsapp'])->assertRedirect();
+    }
+
+    public function test_franquia_b_nao_reprocessa_integracao_da_franquia_a(): void
+    {
+        $this->activeSubscription(null, $this->unitA);
+        $job = IntegrationJob::where('operation', 'link_planista')->firstOrFail();
+        $this->assertSame($this->unitA->id, $job->franchise_id);
+
+        $this->actingAs($this->userWith('admin_tecnico', $this->unitB))->withSession([FranchiseContext::SESSION_KEY => $this->unitB->id])
+            ->post(route('integrations.retry', $job))->assertForbidden();
+        $this->actingAs($this->userWith('admin_tecnico', $this->central))->withSession([FranchiseContext::SESSION_KEY => $this->central->id])
+            ->post(route('integrations.retry', $job))->assertRedirect();
+    }
+
+    public function test_webhook_so_e_reprocessado_pela_central(): void
+    {
+        $this->activeSubscription(null, $this->unitA);
+        Queue::fake();
+        $inbox = WebhookInbox::firstOrFail();
+
+        $this->actingAs($this->userWith('admin_tecnico', $this->unitB))->withSession([FranchiseContext::SESSION_KEY => $this->unitB->id])
+            ->post(route('integrations.webhook.retry', $inbox))->assertForbidden();
+        $this->actingAs($this->userWith('admin_tecnico', $this->central))->withSession([FranchiseContext::SESSION_KEY => $this->central->id])
+            ->post(route('integrations.webhook.retry', $inbox))->assertRedirect();
+    }
+
+    public function test_vincular_proposta_a_cliente_existente_e_so_da_central(): void
+    {
+        $customer = $this->customer();
+        $proposal = $this->proposal($customer, $this->pet($customer), $this->unitA);
+
+        $this->actingAs($this->userWith('gestor', $this->unitA))->withSession([FranchiseContext::SESSION_KEY => $this->unitA->id])
+            ->post(route('proposals.resolve', $proposal), ['customer_id' => $customer->id, 'reason' => 'teste'])->assertForbidden();
+    }
+
+    public function test_cadastro_de_pet_nao_redireciona_para_fora_do_sistema(): void
+    {
+        $customer = $this->customer();
+        $user = $this->userWith('recepcao', $this->unitA);
+        $pet = ['name' => 'Rex', 'species' => 'dog'];
+
+        $this->actingAs($user)->withSession([FranchiseContext::SESSION_KEY => $this->unitA->id])
+            ->post(route('pets.store', $customer), $pet + ['return_to' => 'https://golpe.example/entrar'])
+            ->assertRedirect(route('customers.show', $customer));
+        $back = route('proposals.create', ['customer_id' => $customer->id]);
+        $this->actingAs($user)->withSession([FranchiseContext::SESSION_KEY => $this->unitA->id])
+            ->post(route('pets.store', $customer), $pet + ['return_to' => $back])
+            ->assertRedirect($back);
+    }
+
+    public function test_gestor_da_unidade_nao_altera_usuario_que_tambem_atua_fora_dela(): void
+    {
+        $gestorA = $this->userWith('gestor', $this->unitA);
+        $central = $this->userWith('admin_tecnico', $this->central);
+        FranchiseUser::create(['user_id' => $central->id, 'franchise_id' => $this->unitA->id, 'role_id' => Role::where('key', 'recepcao')->value('id')]);
+        $soA = $this->userWith('recepcao', $this->unitA);
+        // Trocar o e-mail já basta para assumir a conta (recuperação de senha); sem senha, o teste não consulta a rede.
+        $data = fn (User $u) => ['name' => $u->name, 'email' => 'outro-'.$u->email, 'is_active' => 1];
+
+        $this->actingAs($gestorA)->withSession([FranchiseContext::SESSION_KEY => $this->unitA->id])
+            ->put(route('users.update', $central), $data($central))->assertForbidden();
+        $this->actingAs($gestorA)->withSession([FranchiseContext::SESSION_KEY => $this->unitA->id])
+            ->put(route('users.update', $soA), $data($soA))->assertRedirect();
     }
 
     public function test_trocar_franchise_id_na_sessao_nao_concede_acesso(): void

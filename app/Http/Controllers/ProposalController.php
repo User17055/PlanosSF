@@ -106,6 +106,7 @@ class ProposalController extends Controller
 
     public function linkSent(Request $request, Proposal $proposal)
     {
+        abort_unless($this->ctx->canSeeFranchiseRecord($proposal->originating_franchise_id), 403);
         $data = $request->validate(['channel' => 'required|in:whatsapp,email,sms,presencial,outro']);
         $this->proposals->registerLinkSent($proposal, $request->user(), $data['channel']);
 

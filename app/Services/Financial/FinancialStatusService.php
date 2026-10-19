@@ -9,6 +9,7 @@ use App\Models\CustomerFinancialEvent;
 use App\Models\CustomerFinancialStatus;
 use App\Models\Invoice;
 use App\Models\Subscription;
+use App\Models\SubscriptionEvent;
 use App\Services\Audit\AuditLogger;
 use App\Services\Integrations\IntegrationOutbox;
 use App\Services\Subscriptions\SubscriptionRecorder;
@@ -123,12 +124,13 @@ class FinancialStatusService
 
         foreach ($subscriptions as $sub) {
             if ($snapshot->isDelinquent() && in_array($sub->status, [SubscriptionStatus::Active, SubscriptionStatus::CancellationScheduled], true)) {
-                $this->recorder->transition($sub, SubscriptionStatus::Suspended, 'suspended', 'Dívida vencida do cliente: bloqueio global sem tolerância', [
+                $suspended = $this->recorder->transition($sub, SubscriptionStatus::Suspended, 'suspended', 'Dívida vencida do cliente: bloqueio global sem tolerância', [
                     'faturas' => $snapshot->overdueInvoiceIds,
                     'status_anterior' => $sub->getOriginal('status') instanceof SubscriptionStatus ? $sub->getOriginal('status')->value : $sub->getOriginal('status'),
                 ]);
-                $this->outbox->enqueue('simplesvet', 'suspend_planista', $sub, ['subscription_number' => $sub->number], 'suspend-'.now()->format('YmdHis'));
-                $this->outbox->enqueue('tudoprapet', 'block_benefits', $customer, ['customer_id' => $customer->id], 'block-'.now()->format('YmdHis'));
+                // Chave = a transição (não o relógio): repetir não duplica e duas transições no mesmo segundo não colidem.
+                $this->outbox->enqueue('simplesvet', 'suspend_planista', $sub, ['subscription_number' => $sub->number], 'suspend-'.$suspended->id);
+                $this->outbox->enqueue('tudoprapet', 'block_benefits', $customer, ['customer_id' => $customer->id], 'block-'.$this->lastFinancialEventId($customer, 'blocked', $suspended));
             }
 
             if (! $snapshot->isDelinquent() && $sub->status === SubscriptionStatus::Suspended) {
@@ -136,11 +138,19 @@ class FinancialStatusService
                 $previous = $sub->events()->where('event', 'suspended')->first()?->data['status_anterior'] ?? SubscriptionStatus::Active->value;
                 $target = $previous === SubscriptionStatus::CancellationScheduled->value
                     ? SubscriptionStatus::CancellationScheduled : SubscriptionStatus::Active;
-                $this->recorder->transition($sub, $target, 'reactivated', 'Regularização financeira confirmada');
-                $this->outbox->enqueue('simplesvet', 'reactivate_planista', $sub, ['subscription_number' => $sub->number], 'reactivate-'.now()->format('YmdHis'));
-                $this->outbox->enqueue('tudoprapet', 'enable_benefits', $customer, ['customer_id' => $customer->id], 'enable-'.now()->format('YmdHis'));
+                $reactivated = $this->recorder->transition($sub, $target, 'reactivated', 'Regularização financeira confirmada');
+                $this->outbox->enqueue('simplesvet', 'reactivate_planista', $sub, ['subscription_number' => $sub->number], 'reactivate-'.$reactivated->id);
+                $this->outbox->enqueue('tudoprapet', 'enable_benefits', $customer, ['customer_id' => $customer->id], 'enable-'.$this->lastFinancialEventId($customer, 'unblocked', $reactivated));
             }
         }
+    }
+
+    /** Último bloqueio/desbloqueio do cliente; sem ele (assinatura fora de sincronia), a transição da assinatura. */
+    protected function lastFinancialEventId(Customer $customer, string $event, SubscriptionEvent $fallback): string
+    {
+        $id = CustomerFinancialEvent::where('customer_id', $customer->id)->where('event', $event)->max('id');
+
+        return $id ? (string) $id : 'sub'.$fallback->id;
     }
 
     /** Rotina: a passagem do tempo cria dívida sem novo evento — revisa vencimentos. */

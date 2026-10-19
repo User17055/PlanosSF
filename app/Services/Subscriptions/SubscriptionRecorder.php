@@ -63,14 +63,15 @@ class SubscriptionRecorder
         ]);
     }
 
-    public function transition(Subscription $subscription, SubscriptionStatus $to, string $event, ?string $reason = null, ?array $data = null, string $source = 'system', ?CarbonInterface $occurredAt = null): void
+    public function transition(Subscription $subscription, SubscriptionStatus $to, string $event, ?string $reason = null, ?array $data = null, string $source = 'system', ?CarbonInterface $occurredAt = null): ?SubscriptionEvent
     {
         $from = $subscription->status;
         if ($from === $to) {
-            return;
+            return null;
         }
         $subscription->status = $to;
         $subscription->save();
-        $this->event($subscription, $event, $from, $to, $reason, $data, $source, $occurredAt);
+
+        return $this->event($subscription, $event, $from, $to, $reason, $data, $source, $occurredAt);
     }
 }

@@ -133,6 +133,11 @@ class UserController extends Controller
 
     protected function assertManageable(User $user): void
     {
-        abort_unless($this->ctx->isCentral() || $user->memberships()->where('franchise_id', $this->ctx->id())->exists(), 403);
+        // Na unidade, só quem atua apenas nela: quem também tem vínculo ativo na central ou em outra unidade é
+        // alterado pela central (senão o gestor da unidade assumiria um acesso maior que o dele).
+        abort_unless($this->ctx->isCentral() || (
+            $user->memberships()->where('franchise_id', $this->ctx->id())->exists()
+            && ! $user->memberships()->where('is_active', true)->where('franchise_id', '!=', $this->ctx->id())->exists()
+        ), 403);
     }
 }

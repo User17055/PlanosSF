@@ -31,8 +31,11 @@ class WebhookReceiver
                 'status' => 'received',
             ]);
         } catch (UniqueConstraintViolationException) {
-            // Reenvio do mesmo evento: já está registrado; não duplica processamento.
-            return WebhookInbox::where('provider', $provider)->where('payload_hash', $hash)->firstOrFail();
+            // Reenvio do mesmo evento (mesmo id ou mesmo conteúdo): já está registrado; não duplica processamento.
+            return WebhookInbox::where('provider', $provider)
+                ->where(fn ($q) => $q->where('payload_hash', $hash)
+                    ->when(isset($event['id']), fn ($q) => $q->orWhere('event_id', $event['id'])))
+                ->firstOrFail();
         }
 
         ProcessWebhookEvent::dispatch($inbox->id)->onQueue('payments');

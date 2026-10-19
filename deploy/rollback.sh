@@ -12,6 +12,6 @@ php artisan package:discover >/dev/null
 sudo -u deploy -H npm ci --no-audit --no-fund --silent && sudo -u deploy -H npm run build --silent
 php artisan optimize:clear >/dev/null
 php artisan config:cache && php artisan route:cache && php artisan view:cache
-chown -R www-data:www-data storage bootstrap/cache
+chown -R www-data:deploy storage bootstrap/cache && find storage bootstrap/cache -type d -exec chmod g+rwxs {} +
 php artisan queue:restart && systemctl restart planossf-queue
 echo "Código revertido para $TARGET"

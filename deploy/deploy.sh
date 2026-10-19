@@ -40,7 +40,8 @@ fi
 bash deploy/app-grants.sh
 php artisan db:seed --class=AccessSeeder --force
 php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan event:cache
-chown -R www-data:www-data storage bootstrap/cache
+# Dono www-data (site e fila); o grupo deploy escreve só nas pastas: o git reset do próximo deploy roda como deploy.
+chown -R www-data:deploy storage bootstrap/cache && find storage bootstrap/cache -type d -exec chmod g+rwxs {} +
 php artisan up
 
 echo "==> Reiniciando workers"

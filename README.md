@@ -44,7 +44,7 @@ cp .env.example .env            # preencher DB_*, APP_URL, VINDI_* (nunca versio
 composer install --no-dev --optimize-autoloader && npm ci && npm run build
 php artisan key:generate && php artisan migrate --force && php artisan db:seed --force
 php artisan planos:create-user admin@exemplo.com "Administrador" admin_tecnico CENTRAL
-chown -R www-data:www-data storage bootstrap/cache && chmod 640 .env
+chown -R www-data:deploy storage bootstrap/cache && find storage bootstrap/cache -type d -exec chmod g+rwxs {} + && chmod 640 .env
 ```
 
 - **Nginx:** raiz exclusivamente em `public/`; bloquear arquivos ocultos; HTTPS via certbot.

@@ -40,16 +40,16 @@ class BenefitService
         }
 
         if ($existing = Authorization::where('idempotency_key', $idempotencyKey)->first()) {
-            if ($existing->subscription_id !== $subscription->id || $existing->benefit_rule_id !== $rule->id || $existing->quantity !== $quantity) {
-                throw new HttpException(409, 'Chave de requisição já utilizada com dados diferentes.');
-            }
-
-            return ['authorization' => $existing, 'decision' => new Decision(true, 'AUTHORIZED', 'Reserva já registrada.')];
+            return $this->replay($existing, $subscription, $rule, $quantity);
         }
 
         try {
             return DB::transaction(function () use ($subscription, $rule, $quantity, $user, $franchise, $idempotencyKey, $notes) {
                 $sub = $this->lock($subscription);
+                // Mesma chave em paralelo: a outra requisição gravou enquanto esta esperava o bloqueio.
+                if ($existing = Authorization::where('idempotency_key', $idempotencyKey)->first()) {
+                    return $this->replay($existing, $subscription, $rule, $quantity);
+                }
                 $now = CarbonImmutable::now();
 
                 // Avaliação preliminar (vigência, financeiro, carência) antes de materializar o período.
@@ -172,7 +172,8 @@ class BenefitService
             if (! $original) {
                 throw ValidationException::withMessages(['authorization' => 'Não há consumo confirmado para estornar.']);
             }
-            if (BenefitLedgerEntry::where('original_entry_id', $original->id)->exists()) {
+            // Leitura com bloqueio: a leitura comum enxerga o banco de antes da espera e não vê um estorno paralelo.
+            if (BenefitLedgerEntry::where('original_entry_id', $original->id)->lockForUpdate()->first()) {
                 throw ValidationException::withMessages(['authorization' => 'Esta utilização já foi estornada.']);
             }
 
@@ -199,6 +200,16 @@ class BenefitService
         return Authorization::where('status', AuthorizationStatus::Reserved->value)
             ->where('expires_at', '<=', now())
             ->update(['status' => AuthorizationStatus::Expired->value, 'updated_at' => now()]);
+    }
+
+    /** @return array{authorization: Authorization, decision: Decision} */
+    protected function replay(Authorization $existing, Subscription $subscription, BenefitRule $rule, int $quantity): array
+    {
+        if ($existing->subscription_id !== $subscription->id || $existing->benefit_rule_id !== $rule->id || $existing->quantity !== $quantity) {
+            throw new HttpException(409, 'Chave de requisição já utilizada com dados diferentes.');
+        }
+
+        return ['authorization' => $existing, 'decision' => new Decision(true, 'AUTHORIZED', 'Reserva já registrada.')];
     }
 
     protected function lock(Subscription $subscription): Subscription

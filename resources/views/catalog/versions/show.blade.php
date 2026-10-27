@@ -121,8 +121,8 @@
                     <div>
                         <strong>{{ $rule->description }}</strong> <code>{{ $rule->service_code }}</code><br>
                         <span class="small">
-                            {{ $rule->coverage_type->label() }}@if ($rule->discount_percent) ({{ $rule->discount_percent }}%)@endif ·
-                            {{ $rule->isUnlimited() ? 'sem limite de quantidade' : $rule->quantity_limit.' '.$rule->unit.' por '.mb_strtolower($rule->period_type?->label() ?? '—') }}
+                            {{ $rule->coverage_type->label() }}@if ($rule->discount_percent) ({{ \App\Support\BenefitText::percent($rule->discount_percent) }})@endif ·
+                            {{ $rule->isUnlimited() ? 'sem limite de quantidade' : \App\Support\BenefitText::quantity($rule->quantity_limit, $rule->unit).' por '.mb_strtolower($rule->period_type?->label() ?? '—') }}
                             @if ($rule->rolling_window_days) ({{ $rule->rolling_window_days }} dias)@endif ·
                             carência {{ $rule->waiting_days }} dias
                             @if ($rule->min_interval_days) · intervalo mínimo {{ $rule->min_interval_days }} dias @endif

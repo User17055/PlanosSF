@@ -59,8 +59,8 @@
     @foreach ($c['benefits'] as $b)
         <tr>
             <td>{{ $b['description'] }} ({{ $b['service_code'] }})</td>
-            <td>{{ $b['coverage_label'] }}{{ $b['discount_percent'] ? ' — '.$b['discount_percent'].'%' : '' }}</td>
-            <td>{{ $b['quantity_limit'] ? $b['quantity_limit'].' '.$b['unit'].' por '.mb_strtolower($b['period_label'] ?? '') : 'Sem limite de quantidade' }}{{ $b['rolling_window_days'] ? ' ('.$b['rolling_window_days'].' dias)' : '' }}</td>
+            <td>{{ $b['coverage_label'] }}{{ $b['discount_percent'] ? ' — '.\App\Support\BenefitText::percent($b['discount_percent']) : '' }}</td>
+            <td>{{ $b['quantity_limit'] ? \App\Support\BenefitText::quantity($b['quantity_limit'], $b['unit']).' por '.mb_strtolower($b['period_label'] ?? '') : 'Sem limite de quantidade' }}{{ $b['rolling_window_days'] ? ' ('.$b['rolling_window_days'].' dias)' : '' }}</td>
             <td>{{ $b['waiting_days'] }} dias</td>
             <td>
                 @if ($b['copay_cents'])Coparticipação {{ \App\Support\Money::format($b['copay_cents']) }}. @endif

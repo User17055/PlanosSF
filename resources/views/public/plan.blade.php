@@ -15,8 +15,8 @@
         <thead><tr><th>Benefício</th><th>Cobertura</th><th>Limite</th><th>Carência</th></tr></thead>
         <tbody>@foreach ($version->benefitRules as $b)
             <tr><td>{{ $b->description }}@if ($b->exclusions)<div class="small text-muted">Exclusões: {{ $b->exclusions }}</div>@endif</td>
-                <td>{{ $b->coverage_type->label() }}{{ $b->discount_percent ? ' '.$b->discount_percent.'%' : '' }}@if ($b->copay_cents)<div class="small">coparticipação @money($b->copay_cents)</div>@endif</td>
-                <td>{{ $b->isUnlimited() ? 'Sem limite de quantidade' : $b->quantity_limit.' '.$b->unit.' por '.mb_strtolower($b->period_type->label()) }}</td>
+                <td>{{ $b->coverage_type->label() }}{{ $b->discount_percent ? ' '.\App\Support\BenefitText::percent($b->discount_percent) : '' }}@if ($b->copay_cents)<div class="small">coparticipação @money($b->copay_cents)</div>@endif</td>
+                <td>{{ $b->isUnlimited() ? 'Sem limite de quantidade' : \App\Support\BenefitText::quantity($b->quantity_limit, $b->unit).' por '.mb_strtolower($b->period_type->label()) }}</td>
                 <td>{{ $b->waiting_days }} dias</td></tr>
         @endforeach</tbody>
     </table></div>

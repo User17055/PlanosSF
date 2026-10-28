@@ -32,8 +32,8 @@
     <div class="table-responsive"><table class="table table-sm mb-0">
         <thead><tr><th>Benefício</th><th>Cobertura</th><th>Limite</th><th>Carência</th></tr></thead>
         <tbody>@foreach ($s['benefits'] as $b)
-            <tr><td>{{ $b['description'] }}</td><td>{{ $b['coverage_label'] }}{{ $b['discount_percent'] ? ' '.$b['discount_percent'].'%' : '' }}</td>
-                <td>{{ $b['quantity_limit'] ? $b['quantity_limit'].' '.$b['unit'].' / '.mb_strtolower($b['period_label'] ?? '') : 'sem limite' }}</td>
+            <tr><td>{{ $b['description'] }}</td><td>{{ $b['coverage_label'] }}{{ $b['discount_percent'] ? ' '.\App\Support\BenefitText::percent($b['discount_percent']) : '' }}</td>
+                <td>{{ $b['quantity_limit'] ? \App\Support\BenefitText::quantity($b['quantity_limit'], $b['unit']).' / '.mb_strtolower($b['period_label'] ?? '') : 'sem limite' }}</td>
                 <td>{{ $b['waiting_days'] }} dias</td></tr>
         @endforeach</tbody>
     </table></div>
